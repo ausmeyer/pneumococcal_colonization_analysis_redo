@@ -3,10 +3,14 @@ rm(list = ls())
 setwd('~/Google Drive/Documents/PostPostDoc/pneumococcal_colonization_analysis_redo/')
 
 ## Library Imports
-libraries.call <- c("dplyr", "ggplot2", "readxl", "reshape")
+libraries.call <- c("dplyr", 'tidyr', "ggplot2", "readxl", "reshape")
 lapply(libraries.call, require, character.only = TRUE)
 
 ## Utility Functions
+calc.pretest <- function(df, variable) {
+  pretest <- sum(df[[variable]] == '1') / nrow(df)
+}
+
 generate.matrix <- function(df, cutoff, variable, response) {
   t.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 1))
   f.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 0))
@@ -23,9 +27,10 @@ calculate.test.stats <- function(df) {
 }
 
 make.test.stats.df <- function(df, which.variable) {
-  df.series <- seq(0, max(df$variable), by = 0.01)
+  df.series <- seq(0, max(df$variable), length = 1000)
   df.stats <- data.frame()
   invisible(sapply(df.series, function(x) df.stats <<- rbind(df.stats, (calculate.test.stats(generate.matrix(df, cutoff = x, variable = "variable", response = which.variable))))))
+  df.stats <- cbind(x.value = df.series, df.stats)
   return(df.stats)
 }
 
@@ -70,12 +75,12 @@ make.roc.plot <- function(df, file.name) {
   df <- df[order(df$y), ]
   
   p <- ggplot() + 
-    geom_point(data = df, aes(x = x, y = y), size = 1) +
-    geom_line(data = df, aes(x = x, y = y)) +
+    geom_line(data = df, aes(x = x, y = y), size = 1.5) +
     geom_abline(slope = 1, intercept = 0) +
-    xlab("1 - Specificity") +
-    ylab("Sensitivity") +
+    xlab("1 - specificity") +
+    ylab("sensitivity") +
     theme_bw()
+  
   ggsave(plot = p, filename = paste("ROC_", file.name, sep = ''), height = 5, width = 6)
   return(p)
 }
@@ -86,14 +91,100 @@ make.logistic.plot <- function(df, file.name) {
   
   p <- ggplot() + 
     geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "Diagnosis Status")) +
-    geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'Logistic Fit')) +
-    geom_line(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'Logistic Fit')) +
-    xlab("LytA Concentration (units)") +
-    ylab("Pneumococcal pneumonia diagnosis") +
+    geom_line(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'Logistic Fit'), size = 1.5) +
+    xlab("substrate concentration (units)") +
+    ylab("pneumococcal pneumonia diagnosis") +
     scale_color_discrete(name = "") +
     theme_bw()
+  
   ggsave(plot = p, filename = paste("Logistic_", file.name, sep = ''), height = 5, width = 7)
   return(p)
+}
+
+make.sens.spec.plot <- function(df, file.name) {
+  df.reformed <- melt(df, id = c("x.value"))
+  colnames(df.reformed) <- c('x', 'var', 'y')
+  
+  reformed.sens <- left.censor(filter(df.reformed, var == 'sens'))
+  reformed.sens <- cbind(reformed.sens, var = rep('sens', nrow(reformed.sens)))
+  reformed.sens <- reformed.sens[rev(order(reformed.sens$y)), ]
+  
+  reformed.spec <- left.censor(filter(df.reformed, var == 'spec'))
+  reformed.spec <- cbind(reformed.spec, var = rep('spec', nrow(reformed.spec)))
+  reformed.spec <- reformed.spec[order(reformed.spec$y), ]
+  reformed.censored <- rbind(reformed.sens, reformed.spec)
+  
+  p <- ggplot() + 
+    geom_line(data = reformed.censored, aes(x = x, y = y, color = var), size = 1.5) +
+    xlab("substrate concentration (units)") +
+    ylab("") +
+    scale_color_discrete(name = "", labels = c(sens = "sensitivity", spec = "specificity")) +
+    theme_bw()
+  
+  ggsave(plot = p, filename = paste("SensSpec_", file.name, sep = ''), height = 5, width = 7)
+  return(list(plot = p, df.reformed = df.reformed))
+}
+
+make.likelihoodratio.plot <- function(df, file.name) {
+  df <- df[df$sens != 0 & df$spec != 0, ]
+  
+  p <- ggplot() + 
+    geom_segment(aes(x = 0, y = 1, xend = max(df$x.value), yend = 1), linetype = 2) +
+    geom_point(data = df, aes(x = x.value, y = sens / (1 - spec), color = 'LR positive'), size = 0.5) +
+    geom_point(data = df, aes(x = x.value, y = (1 - sens) / spec, color = 'LR negative'), size = 0.5) +
+    geom_smooth(data = df, aes(x = x.value, y = sens / (1 - spec), color = 'LR positive'), size = 0.5, se = F) +
+    geom_smooth(data = df, aes(x = x.value, y = (1 - sens) / spec, color = 'LR negative'), size = 0.5, se = F) +
+    ylim(0,5) + 
+    xlab("substrate concentration (units)") +
+    ylab("likelihood ratio") +
+    scale_color_discrete(name = "") +
+    theme_bw()
+  
+  ggsave(plot = p, filename = paste("LR_", file.name, sep = ''), height = 5, width = 7)
+  return(list(plot = p))
+}
+
+make.probability.plots <- function(df.raw, df, file.name) {
+  require(cowplot)
+  pretest <- calc.pretest(df.raw, "pneumo")
+  
+  df <- df[df$sens != 0 & df$spec != 0, ]
+  
+  p1 <- ggplot() + 
+    #geom_vline(xintercept = 2) +
+    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5) +
+    geom_point(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5) +
+    geom_smooth(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5, se = F) +
+    geom_smooth(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5, se = F) +
+    ylim(0,1) + 
+    xlab("substrate concentration (units)") +
+    ylab("probability of pneumococcal pneumonia") +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest probability positive', c = 'posttest probability negative')) +
+    theme_bw()
+  
+  p2 <- ggplot() + 
+    #geom_vline(xintercept = 2) + 
+    geom_point(data = df, aes(x = x.value, 
+                              y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), 
+                              color = 'a'), 
+               size = 0.5) +
+    geom_smooth(data = df, aes(x = x.value, 
+                               y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), 
+                               color = 'a'), 
+                size = 0.5,
+                se = F) +
+    ylim(0,1) + 
+    xlab("substrate concentration (units)") +
+    ylab("posttest probability difference") +
+    scale_color_discrete(name = "", labels = c(a = 'probability difference')) +
+    theme_bw()
+  
+  p <- plot_grid(p1, p2, labels = c('A', 'B'))
+  
+  ggsave(plot = p, filename = paste("Prob_", file.name, sep = ''), height = 5, width = 15)
+  return(list(plot = p))
 }
 
 lytA.filename <- 'lytA.pdf'
@@ -101,63 +192,17 @@ raw.lytA <- import.data(variable = 'lytA_NP')
 make.logistic.plot(df = raw.lytA, file.name = lytA.filename)
 roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
 make.roc.plot(df = roc.data.lytA, file.name = lytA.filename)
+p.sens.spec <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename)
+make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename)
+make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename)
 
 pct.filename <- 'pct.pdf'
 raw.pct <- import.data(variable = 'PCT')
 make.logistic.plot(df = raw.pct, file.name = pct.filename)
 roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
 make.roc.plot(df = roc.data.pct, file.name = pct.filename)
+p.sens.spec <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename)
+make.likelihoodratio.plot(roc.data.pct, pct.filename)
+make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename)
 
-# 
-# reform <- data.frame(lytA = lytA.series, sens = test.stats$sens, spec = test.stats$spec)
-# reform.melted <- melt(reform, id = c("lytA"))
-# colnames(reform.melted) <- c('x', 'var', 'y')
-# 
-# reform.sens <- left.censor(filter(reform.melted, var == 'sens'))
-# reform.sens <- cbind(reform.sens, var = rep('sens', nrow(reform.sens)))
-# reform.sens <- reform.sens[rev(order(reform.sens$y)), ]
-# 
-# reform.spec <- left.censor(filter(reform.melted, var == 'spec'))
-# reform.spec <- cbind(reform.spec, var = rep('spec', nrow(reform.spec)))
-# reform.spec <- reform.spec[order(reform.spec$y), ]
-# reform.censored <- rbind(reform.sens, reform.spec)
-# 
-# p <- ggplot() + 
-#   geom_point(data = reform.censored, aes(x = x, y = y, color = var)) +
-#   geom_line(data = reform.censored, aes(x = x, y = y, color = var)) +
-#   theme_bw()
-# show(p)
-# 
-# pretest <- sum(raw.lytA$pneumo == '1')/nrow(raw.lytA)
-# reform <- reform[reform$sens != 0 & reform$spec != 0, ]
-# 
-# p <- ggplot() + 
-#   geom_point(data = reform, aes(x = lytA, y = sens / (1 - spec), color = 'LR Positive')) +
-#   geom_point(data = reform, aes(x = lytA, y = (1 - sens) / spec, color = 'LR Negative')) +
-#   geom_smooth(data = reform, aes(x = lytA, y = sens / (1 - spec), color = 'LR Positive')) +
-#   geom_smooth(data = reform, aes(x = lytA, y = (1 - sens) / spec, color = 'LR Negative')) +
-#   geom_vline(xintercept = 8) + 
-#   ylim(0,5) + 
-#   theme_bw()
-# show(p)
-# 
-# p <- ggplot() + 
-#   geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'Pretest Probability')) +
-#   geom_point(data = reform, aes(x = lytA, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = 'Positive Probability')) +
-#   geom_point(data = reform, aes(x = lytA, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = 'Negative Probability')) +
-#   geom_smooth(data = reform, aes(x = lytA, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = 'Positive Probability')) +
-#   geom_smooth(data = reform, aes(x = lytA, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = 'Negative Probability')) +
-#   geom_vline(xintercept = 8) + 
-#   ylim(0,1) + 
-#   theme_bw()
-# show(p)
-# 
-# #reform$sens <- rep(1.0, nrow(reform))
-# p <- ggplot() + 
-#   #geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'Pretest Probability')) +
-#   geom_point(data = reform, aes(x = lytA, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = 'Probability Difference')) +
-#   geom_smooth(data = reform, aes(x = lytA, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = 'Probability Difference')) +
-#   geom_vline(xintercept = 8) + 
-#   ylim(0,1) + 
-#   theme_bw()
-# show(p)
+
