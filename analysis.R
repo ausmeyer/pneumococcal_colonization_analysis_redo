@@ -99,7 +99,7 @@ make.logistic.plot <- function(df, file.name, xaxis) {
     geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "diagnostic status")) +
     geom_line(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'logistic fit'), size = 1.5) +
     xlab(xaxis) +
-    ylab("pneumococcal pneumonia diagnosis") +
+    ylab("pneumococcal diagnosis") +
     scale_color_discrete(name = "") +
     theme_bw()
   
@@ -165,8 +165,8 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     geom_smooth(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5, se = F) +
     ylim(0, 1) + 
     xlab(xaxis) +
-    ylab("probability of pneumococcal pneumonia") +
-    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest probability positive', c = 'posttest probability negative')) +
+    ylab("probability pneumococcal") +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest prob. positive', c = 'posttest prob. negative')) +
     theme_bw()
   
   
@@ -183,14 +183,14 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
                 se = F) +
     ylim(0, 1) + 
     xlab(xaxis) +
-    ylab("posttest probability difference") +
+    ylab("posttest probability diff") +
     scale_color_discrete(name = "", labels = c(a = 'probability difference')) +
     theme_bw()
   
-  p <- plot_grid(p1, p2, labels = c('A', 'B'))
+  #p <- plot_grid(p1, p2)
   
   #ggsave(plot = p, filename = paste("Prob_", file.name, sep = ''), height = 5, width = 15)
-  return(list(plot = p))
+  return(list(plot1 = p1, plot2 = p2))
 }
 
 raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
@@ -247,17 +247,17 @@ p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.n
 
 print(mean(calc.prob.difference(roc.data.crp, pretest = pretest.probability)[100 < roc.data.crp$x.value & roc.data.crp$x.value < 300]))
 
-p.log <- plot_grid(p.log.crp$p, p.log.pct$p, p.log.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 5, width = 20)
+p.log <- plot_grid(p.log.crp$plot, p.log.pct$plot, p.log.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 3, width = 15)
 
-p.roc <- plot_grid(p.roc.crp$p, p.roc.pct$p, p.roc.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.roc, filename = 'rocs.pdf', height = 5, width = 20)
+p.roc <- plot_grid(p.roc.crp$plot, p.roc.pct$plot, p.roc.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.roc, filename = 'rocs.pdf', height = 3, width = 10)
 
-p.sens.spec <- plot_grid(p.sens.spec.crp$p, p.sens.spec.pct$p, p.sens.spec.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 5, width = 20)
+p.sens.spec <- plot_grid(p.sens.spec.crp$plot, p.sens.spec.pct$plot, p.sens.spec.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 3, width = 15)
 
-p.lr <- plot_grid(p.lr.crp$p, p.lr.pct$p, p.lr.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 5, width = 20)
+p.lr <- plot_grid(p.lr.crp$plot, p.lr.pct$plot, p.lr.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 3, width = 15)
 
-p.prob <- plot_grid(p.prob.crp$p, p.prob.pct$p, p.prob.lytA$p, labels = c('A', 'B', 'C'), ncol = 1)
-ggsave(plot = p.prob, filename = "probabilities.pdf", height = 15, width = 15)
+p.prob <- plot_grid(p.prob.crp$plot1, p.prob.crp$plot2, p.prob.pct$plot1, p.prob.pct$plot2, p.prob.lytA$plot1, p.prob.lytA$plot2, labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 2)
+ggsave(plot = p.prob, filename = "probabilities.pdf", height = 9, width = 11)
