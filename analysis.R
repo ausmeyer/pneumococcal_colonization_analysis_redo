@@ -11,6 +11,11 @@ calc.pretest <- function(df, variable) {
   pretest <- sum(df[[variable]] == '1') / nrow(df)
 }
 
+calc.prob.difference <- function(df, pretest) {
+  df <- df[df$sens != 0 & df$spec != 0, ]
+  (pretest * (df$sens / (1 - df$spec)) / (1 - pretest)) / 
+    ((pretest * (df$sens / (1 - df$spec)) / (1 - pretest)) + 1) - (pretest * ((1 - df$sens) / df$spec) / (1 - pretest)) / ((pretest * ((1 - df$sens) / df$spec) / (1 - pretest)) + 1)
+}
 generate.matrix <- function(df, cutoff, variable, response) {
   t.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 1))
   f.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 0))
@@ -63,6 +68,7 @@ make.fit <- function(df) {
   predicted.bacteremia <- predict(fit, type="response", se = TRUE)
   
   fit <- glm(factor(pneumo) ~ variable, data = df, family = "binomial")
+  print(summary(fit))
   predicted.pneumo <- predict(fit, type="response", se = TRUE)
   
   return(data.frame(bacter = predicted.bacteremia, pneumo = predicted.pneumo))
@@ -85,14 +91,14 @@ make.roc.plot <- function(df, file.name) {
   return(p)
 }
 
-make.logistic.plot <- function(df, file.name) {
+make.logistic.plot <- function(df, file.name, xaxis) {
   fit.df <- make.fit(df)
   new.df <- data.frame(variable = df$variable, bacter = df$bacter, prob.bacter = fit.df$bacter.fit, pneumo = df$pneumo, prob.pneumo = fit.df$pneumo.fit)
   
   p <- ggplot() + 
-    geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "Diagnosis Status")) +
-    geom_line(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'Logistic Fit'), size = 1.5) +
-    xlab("substrate concentration (units)") +
+    geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "diagnostic status")) +
+    geom_line(data = new.df, aes(x = variable, y = as.numeric(as.character(prob.pneumo)), color = 'logistic fit'), size = 1.5) +
+    xlab(xaxis) +
     ylab("pneumococcal pneumonia diagnosis") +
     scale_color_discrete(name = "") +
     theme_bw()
@@ -101,7 +107,7 @@ make.logistic.plot <- function(df, file.name) {
   return(p)
 }
 
-make.sens.spec.plot <- function(df, file.name) {
+make.sens.spec.plot <- function(df, file.name, xaxis) {
   df.reformed <- melt(df, id = c("x.value"))
   colnames(df.reformed) <- c('x', 'var', 'y')
   
@@ -116,7 +122,7 @@ make.sens.spec.plot <- function(df, file.name) {
   
   p <- ggplot() + 
     geom_line(data = reformed.censored, aes(x = x, y = y, color = var), size = 1.5) +
-    xlab("substrate concentration (units)") +
+    xlab(xaxis) +
     ylab("") +
     scale_color_discrete(name = "", labels = c(sens = "sensitivity", spec = "specificity")) +
     theme_bw()
@@ -125,7 +131,7 @@ make.sens.spec.plot <- function(df, file.name) {
   return(list(plot = p, df.reformed = df.reformed))
 }
 
-make.likelihoodratio.plot <- function(df, file.name) {
+make.likelihoodratio.plot <- function(df, file.name, xaxis) {
   df <- df[df$sens != 0 & df$spec != 0, ]
   
   p <- ggplot() + 
@@ -135,7 +141,7 @@ make.likelihoodratio.plot <- function(df, file.name) {
     geom_smooth(data = df, aes(x = x.value, y = sens / (1 - spec), color = 'LR positive'), size = 0.5, se = F) +
     geom_smooth(data = df, aes(x = x.value, y = (1 - sens) / spec, color = 'LR negative'), size = 0.5, se = F) +
     ylim(0,5) + 
-    xlab("substrate concentration (units)") +
+    xlab(xaxis) +
     ylab("likelihood ratio") +
     scale_color_discrete(name = "") +
     theme_bw()
@@ -144,7 +150,7 @@ make.likelihoodratio.plot <- function(df, file.name) {
   return(list(plot = p))
 }
 
-make.probability.plots <- function(df.raw, df, file.name) {
+make.probability.plots <- function(df.raw, df, file.name, xaxis) {
   require(cowplot)
   pretest <- calc.pretest(df.raw, "pneumo")
   
@@ -159,24 +165,25 @@ make.probability.plots <- function(df.raw, df, file.name) {
     geom_smooth(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5, se = F) +
     geom_smooth(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5, se = F) +
     ylim(0,1) + 
-    xlab("substrate concentration (units)") +
+    xlab(xaxis) +
     ylab("probability of pneumococcal pneumonia") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest probability positive', c = 'posttest probability negative')) +
     theme_bw()
   
+  
   p2 <- ggplot() + 
     #geom_vline(xintercept = 2) + 
     geom_point(data = df, aes(x = x.value, 
-                              y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), 
+                              y = calc.prob.difference(df, pretest), 
                               color = 'a'), 
                size = 0.5) +
     geom_smooth(data = df, aes(x = x.value, 
-                               y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1) - (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), 
+                               y = calc.prob.difference(df, pretest), 
                                color = 'a'), 
                 size = 0.5,
                 se = F) +
     ylim(0,1) + 
-    xlab("substrate concentration (units)") +
+    xlab(xaxis) +
     ylab("posttest probability difference") +
     scale_color_discrete(name = "", labels = c(a = 'probability difference')) +
     theme_bw()
@@ -188,21 +195,35 @@ make.probability.plots <- function(df.raw, df, file.name) {
 }
 
 lytA.filename <- 'lytA.pdf'
+lytA.xaxis <- 'lytA density (Log10 copies/mL)'
 raw.lytA <- import.data(variable = 'lytA_NP')
-make.logistic.plot(df = raw.lytA, file.name = lytA.filename)
+make.logistic.plot(df = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
 roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
 make.roc.plot(df = roc.data.lytA, file.name = lytA.filename)
-p.sens.spec <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename)
-make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename)
-make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename)
+p.sens.spec <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+print(mean(calc.prob.difference(roc.data.lytA, calc.pretest(raw.lytA, "pneumo"))[roc.data.lytA$x.value < 6]))
 
 pct.filename <- 'pct.pdf'
+pct.xaxis <- 'procalcitonin concentration (ng/mL)'
 raw.pct <- import.data(variable = 'PCT')
-make.logistic.plot(df = raw.pct, file.name = pct.filename)
+make.logistic.plot(df = raw.pct, file.name = pct.filename, xaxis = pct.xaxis)
 roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
 make.roc.plot(df = roc.data.pct, file.name = pct.filename)
-p.sens.spec <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename)
-make.likelihoodratio.plot(roc.data.pct, pct.filename)
-make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename)
+p.sens.spec <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis)
+make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis)
+make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis)
+print(mean(calc.prob.difference(roc.data.pct, calc.pretest(raw.pct, "pneumo"))[2 < roc.data.pct$x.value & roc.data.pct$x.value < 40]))
 
+crp.filename <- 'crp.pdf'
+crp.xaxis <- 'c-reactive protein concentration (mg/L)'
+raw.crp <- import.data(variable = 'CRP')
+make.logistic.plot(df = raw.crp, file.name = crp.filename, xaxis = crp.xaxis)
+roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
+make.roc.plot(df = roc.data.crp, file.name = crp.filename)
+p.sens.spec <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
+make.likelihoodratio.plot(df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
+make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
+print(mean(calc.prob.difference(roc.data.crp, calc.pretest(raw.crp, "pneumo"))[100 < roc.data.crp$x.value & roc.data.crp$x.value < 300]))
 
