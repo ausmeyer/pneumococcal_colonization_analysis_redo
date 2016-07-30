@@ -8,7 +8,7 @@ lapply(libraries.call, require, character.only = TRUE)
 
 ## Utility Functions
 calc.pretest <- function(df, variable) {
-  pretest <- sum(df[[variable]] == '1') / nrow(df)
+  x <- sum(df[[variable]] == '1') / nrow(df)
 }
 
 calc.prob.difference <- function(df, pretest) {
@@ -87,8 +87,8 @@ make.roc.plot <- function(df, file.name) {
     ylab("sensitivity") +
     theme_bw()
   
-  ggsave(plot = p, filename = paste("ROC_", file.name, sep = ''), height = 5, width = 6)
-  return(p)
+  #ggsave(plot = p, filename = paste("ROC_", file.name, sep = ''), height = 5, width = 6)
+  return(list(plot = p))
 }
 
 make.logistic.plot <- function(df, file.name, xaxis) {
@@ -103,8 +103,8 @@ make.logistic.plot <- function(df, file.name, xaxis) {
     scale_color_discrete(name = "") +
     theme_bw()
   
-  ggsave(plot = p, filename = paste("Logistic_", file.name, sep = ''), height = 5, width = 7)
-  return(p)
+  #ggsave(plot = p, filename = paste("Logistic_", file.name, sep = ''), height = 5, width = 7)
+  return(list(plot = p))
 }
 
 make.sens.spec.plot <- function(df, file.name, xaxis) {
@@ -127,12 +127,12 @@ make.sens.spec.plot <- function(df, file.name, xaxis) {
     scale_color_discrete(name = "", labels = c(sens = "sensitivity", spec = "specificity")) +
     theme_bw()
   
-  ggsave(plot = p, filename = paste("SensSpec_", file.name, sep = ''), height = 5, width = 7)
+  #ggsave(plot = p, filename = paste("SensSpec_", file.name, sep = ''), height = 5, width = 7)
   return(list(plot = p, df.reformed = df.reformed))
 }
 
 make.likelihoodratio.plot <- function(df, file.name, xaxis) {
-  df <- df[df$sens != 0 & df$spec != 0, ]
+  df <- df[df$sens != 0 & df$spec != 0 & df$spec != Inf & df$sens != Inf, ]
   
   p <- ggplot() + 
     geom_segment(aes(x = 0, y = 1, xend = max(df$x.value), yend = 1), linetype = 2) +
@@ -140,21 +140,20 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis) {
     geom_point(data = df, aes(x = x.value, y = (1 - sens) / spec, color = 'LR negative'), size = 0.5) +
     geom_smooth(data = df, aes(x = x.value, y = sens / (1 - spec), color = 'LR positive'), size = 0.5, se = F) +
     geom_smooth(data = df, aes(x = x.value, y = (1 - sens) / spec, color = 'LR negative'), size = 0.5, se = F) +
-    ylim(0,5) + 
+    ylim(0, 10) + 
     xlab(xaxis) +
     ylab("likelihood ratio") +
     scale_color_discrete(name = "") +
     theme_bw()
   
-  ggsave(plot = p, filename = paste("LR_", file.name, sep = ''), height = 5, width = 7)
+  #ggsave(plot = p, filename = paste("LR_", file.name, sep = ''), height = 5, width = 7)
   return(list(plot = p))
 }
 
-make.probability.plots <- function(df.raw, df, file.name, xaxis) {
+make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
   require(cowplot)
-  pretest <- calc.pretest(df.raw, "pneumo")
   
-  df <- df[df$sens != 0 & df$spec != 0, ]
+  df <- df[df$sens != 0 & df$spec != 0 & df$spec != Inf & df$sens != Inf, ]
   
   p1 <- ggplot() + 
     #geom_vline(xintercept = 2) +
@@ -164,7 +163,7 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis) {
     geom_point(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5) +
     geom_smooth(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5, se = F) +
     geom_smooth(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5, se = F) +
-    ylim(0,1) + 
+    ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability of pneumococcal pneumonia") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest probability positive', c = 'posttest probability negative')) +
@@ -182,7 +181,7 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis) {
                                color = 'a'), 
                 size = 0.5,
                 se = F) +
-    ylim(0,1) + 
+    ylim(0, 1) + 
     xlab(xaxis) +
     ylab("posttest probability difference") +
     scale_color_discrete(name = "", labels = c(a = 'probability difference')) +
@@ -190,40 +189,75 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis) {
   
   p <- plot_grid(p1, p2, labels = c('A', 'B'))
   
-  ggsave(plot = p, filename = paste("Prob_", file.name, sep = ''), height = 5, width = 15)
+  #ggsave(plot = p, filename = paste("Prob_", file.name, sep = ''), height = 5, width = 15)
   return(list(plot = p))
 }
 
+raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
+pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
+  
+## lytA setup
 lytA.filename <- 'lytA.pdf'
 lytA.xaxis <- 'lytA density (Log10 copies/mL)'
 raw.lytA <- import.data(variable = 'lytA_NP')
-make.logistic.plot(df = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
-roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
-make.roc.plot(df = roc.data.lytA, file.name = lytA.filename)
-p.sens.spec <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
-make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
-make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
-print(mean(calc.prob.difference(roc.data.lytA, calc.pretest(raw.lytA, "pneumo"))[roc.data.lytA$x.value < 6]))
 
+## Plot lytA
+p.log.lytA <- make.logistic.plot(df = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+
+roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
+p.roc.lytA <- make.roc.plot(df = roc.data.lytA, file.name = lytA.filename)
+
+p.sens.spec.lytA <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+p.lr.lytA <- make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis)
+p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+
+print(mean(calc.prob.difference(roc.data.lytA, pretest = pretest.probability)[roc.data.lytA$x.value < 6]))
+
+## pct setup
 pct.filename <- 'pct.pdf'
 pct.xaxis <- 'procalcitonin concentration (ng/mL)'
 raw.pct <- import.data(variable = 'PCT')
-make.logistic.plot(df = raw.pct, file.name = pct.filename, xaxis = pct.xaxis)
-roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
-make.roc.plot(df = roc.data.pct, file.name = pct.filename)
-p.sens.spec <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis)
-make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis)
-make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis)
-print(mean(calc.prob.difference(roc.data.pct, calc.pretest(raw.pct, "pneumo"))[2 < roc.data.pct$x.value & roc.data.pct$x.value < 40]))
 
+## Plot pct
+p.log.pct <- make.logistic.plot(df = raw.pct, file.name = pct.filename, xaxis = pct.xaxis)
+
+roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
+p.roc.pct <- make.roc.plot(df = roc.data.pct, file.name = pct.filename)
+
+p.sens.spec.pct <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis)
+p.lr.pct <- make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis)
+p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+
+print(mean(calc.prob.difference(roc.data.pct, pretest = pretest.probability)[2 < roc.data.pct$x.value & roc.data.pct$x.value < 40]))
+
+## crp setup
 crp.filename <- 'crp.pdf'
 crp.xaxis <- 'c-reactive protein concentration (mg/L)'
 raw.crp <- import.data(variable = 'CRP')
-make.logistic.plot(df = raw.crp, file.name = crp.filename, xaxis = crp.xaxis)
-roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
-make.roc.plot(df = roc.data.crp, file.name = crp.filename)
-p.sens.spec <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
-make.likelihoodratio.plot(df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
-make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
-print(mean(calc.prob.difference(roc.data.crp, calc.pretest(raw.crp, "pneumo"))[100 < roc.data.crp$x.value & roc.data.crp$x.value < 300]))
 
+## Plot crp
+p.log.crp <- make.logistic.plot(df = raw.crp, file.name = crp.filename, xaxis = crp.xaxis)
+
+roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
+p.roc.crp <- make.roc.plot(df = roc.data.crp, file.name = crp.filename)
+
+p.sens.spec.crp <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis)
+p.lr.crp <- make.likelihoodratio.plot(roc.data.crp, crp.filename, xaxis = crp.xaxis)
+p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+
+print(mean(calc.prob.difference(roc.data.crp, pretest = pretest.probability)[100 < roc.data.crp$x.value & roc.data.crp$x.value < 300]))
+
+p.log <- plot_grid(p.log.crp$p, p.log.pct$p, p.log.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 5, width = 20)
+
+p.roc <- plot_grid(p.roc.crp$p, p.roc.pct$p, p.roc.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.roc, filename = 'rocs.pdf', height = 5, width = 20)
+
+p.sens.spec <- plot_grid(p.sens.spec.crp$p, p.sens.spec.pct$p, p.sens.spec.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 5, width = 20)
+
+p.lr <- plot_grid(p.lr.crp$p, p.lr.pct$p, p.lr.lytA$p, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 5, width = 20)
+
+p.prob <- plot_grid(p.prob.crp$p, p.prob.pct$p, p.prob.lytA$p, labels = c('A', 'B', 'C'), ncol = 1)
+ggsave(plot = p.prob, filename = "probabilities.pdf", height = 15, width = 15)
