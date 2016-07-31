@@ -98,12 +98,12 @@ make.roc.plot <- function(df, file.name, xaxis) {
                      y = 0, 
                      xend = min((1 - spec)[(sens + spec - 1) == max(sens + spec - 1)]),
                      yend =  max(sens + spec - 1), 
-                     color = 'optimum value'),
+                     color = 'optimal cutoff'),
                  size = 0.75) +
     geom_point(data = df,
                aes(x = min((1 - spec)[(sens + spec - 1) == max(sens + spec - 1)]), 
                    y = max(sens + spec - 1), 
-                   color = 'optimum value')) +
+                   color = 'optimal cutoff')) +
     geom_hline(yintercept = 0) +
     xlab("false positive rate (1 - sp)") +
     ylab("Youden index (sn + sp - 1)") +
@@ -121,12 +121,12 @@ make.roc.plot <- function(df, file.name, xaxis) {
                      y = 0, 
                      xend = min((x.value)[(sens + spec - 1) == max(sens + spec - 1)]),
                      yend =  max(sens + spec - 1), 
-                     color = 'optimum value'),
+                     color = 'optimal cutoff'),
                  size = 0.75) +
     geom_point(data = df, 
                aes(x = min((x.value)[(sens + spec - 1) == max(sens + spec - 1)]),
                    y =  max(sens + spec - 1),
-                   color = 'optimum value')
+                   color = 'optimal cutoff')
     ) +
     geom_hline(yintercept = 0) +
     xlab(xaxis) +
@@ -195,7 +195,8 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
     xlab(xaxis) +
     ylab("likelihood ratio") +
     scale_color_discrete(name = "") +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
   
   #ggsave(plot = p, filename = paste("LR_", file.name, sep = ''), height = 5, width = 7)
   return(list(plot = p))
@@ -250,13 +251,37 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("posttest probability diff") +
-    scale_color_discrete(name = "", labels = c(a = 'optimum value', b = 'probability difference')) +
+    scale_color_discrete(name = "", labels = c(a = 'optimal cutoff', b = 'probability difference')) +
     theme_bw()
   
-  #p <- plot_grid(p1, p2)
-  
-  #ggsave(plot = p, filename = paste("Prob_", file.name, sep = ''), height = 5, width = 15)
   return(list(plot1 = p1, plot2 = p2, df = df, prob.diff = prob.diff))
+}
+
+make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
+  require(cowplot)
+  
+  prob.diff <- calc.prob.difference(df, pretest)
+  df <- df[!is.na(prob.diff) & is.finite(prob.diff), ]
+
+  LR.pos <- df$sens / (1 - df$spec)
+  LR.neg <- (1 - df$sens) / df$spec
+  combined.probability <- pretest * LR.pos * LR.neg / ((1 - pretest) + pretest * LR.pos * LR.neg)
+  
+  df <- cbind(df, LR.pos = LR.pos, LR.neg = LR.neg, combined.probability)
+    
+  p <- ggplot() + 
+    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
+    #geom_smooth(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5, se = F) +
+    ylim(0, 1) + 
+    xlab(xaxis) +
+    ylab("probability pneumococcal") +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
+    theme_bw() +
+    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+  
+  return(list(plot = p))
 }
 
 raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
@@ -276,6 +301,7 @@ p.roc.lytA <- make.roc.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis
 p.sens.spec.lytA <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
 p.lr.lytA <- make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
 p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
 
 print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
 
@@ -293,6 +319,7 @@ p.roc.pct <- make.roc.plot(df = roc.data.pct, file.name = pct.filename, xaxis = 
 p.sens.spec.pct <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
 p.lr.pct <- make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
 p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
 
 print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
 
@@ -310,6 +337,7 @@ p.roc.crp <- make.roc.plot(df = roc.data.crp, file.name = crp.filename, xaxis = 
 p.sens.spec.crp <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
 p.lr.crp <- make.likelihoodratio.plot(roc.data.crp, crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
 p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
 
 print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
 
@@ -328,7 +356,10 @@ p.sens.spec <- plot_grid(p.sens.spec.crp$plot, p.sens.spec.pct$plot, p.sens.spec
 ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 3, width = 15)
 
 p.lr <- plot_grid(p.lr.crp$plot, p.lr.pct$plot, p.lr.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 3, width = 15)
+ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 4, width = 13)
 
 p.prob <- plot_grid(p.prob.crp$plot1, p.prob.crp$plot2, p.prob.pct$plot1, p.prob.pct$plot2, p.prob.lytA$plot1, p.prob.lytA$plot2, labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 2)
 ggsave(plot = p.prob, filename = "probabilities.pdf", height = 9, width = 11)
+
+p.combined.prob <- plot_grid(p.combined.prob.crp$plot, p.combined.prob.pct$plot, p.combined.prob.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 4, width = 13)
