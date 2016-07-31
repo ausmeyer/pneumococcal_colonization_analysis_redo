@@ -110,7 +110,7 @@ make.roc.plot <- function(df, file.name, xaxis) {
     xlim(0, 1) +
     ylim(-1, 1) +
     theme_bw() +
-    theme(legend.position = c(0.5, 0.3), legend.title=element_blank())
+    theme(legend.position = c(0.5, 0.27), legend.title=element_blank())
   
   print(median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)]))
   
@@ -133,7 +133,7 @@ make.roc.plot <- function(df, file.name, xaxis) {
     ylab("Youden index (sn + sp - 1)") +
     ylim(-1, 1) +
     theme_bw() +
-    theme(legend.position = c(0.5, 0.3), legend.title=element_blank())
+    theme(legend.position = c(0.5, 0.27), legend.title=element_blank())
   
   return(list(plot1 = p1, plot2 = p2, plot3 = p3))
 }
