@@ -397,4 +397,4 @@ p.prob <- plot_grid(p.prob.crp$plot1, p.prob.pct$plot1, p.prob.lytA$plot1, p.pro
 ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
 
 p.combined.prob <- plot_grid(p.combined.prob.crp$plot, p.combined.prob.pct$plot, p.combined.prob.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 3.5, width = 11)
+ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 3.5, width = 11.5)
