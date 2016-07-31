@@ -314,7 +314,7 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylab("probability pneumococcal") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.4, 0.85), legend.title=element_blank())
   
   return(list(plot = p))
 }
@@ -397,4 +397,4 @@ p.prob <- plot_grid(p.prob.crp$plot1, p.prob.pct$plot1, p.prob.lytA$plot1, p.pro
 ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
 
 p.combined.prob <- plot_grid(p.combined.prob.crp$plot, p.combined.prob.pct$plot, p.combined.prob.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 4, width = 13)
+ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 3.5, width = 11)
