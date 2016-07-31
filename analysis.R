@@ -401,7 +401,7 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
-    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'continuous posttest probability')) +
     theme_bw() +
     theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
   
