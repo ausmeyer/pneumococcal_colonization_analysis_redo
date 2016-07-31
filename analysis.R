@@ -264,7 +264,7 @@ pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
 
 ## lytA setup
 lytA.filename <- 'lytA.pdf'
-lytA.xaxis <- 'lytA density (Log10 copies/mL)'
+lytA.xaxis <- 'lytA density (log10 copies/mL)'
 raw.lytA <- import.data(variable = 'lytA_NP')
 
 ## Plot lytA
