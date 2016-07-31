@@ -246,11 +246,12 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
   p1 <- ggplot() + 
     #geom_vline(xintercept = 2) +
     geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
     geom_point(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5) +
     geom_point(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5) +
     geom_smooth(data = df, aes(x = x.value, y = (pretest * (sens / (1 - spec)) / (1 - pretest)) / ((pretest * (sens / (1 - spec)) / (1 - pretest)) + 1), color = "b"), size = 0.5, se = F) +
     geom_smooth(data = df, aes(x = x.value, y = (pretest * ((1 - sens) / spec) / (1 - pretest)) / ((pretest * ((1 - sens) / spec) / (1 - pretest)) + 1), color = "c"), size = 0.5, se = F) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
@@ -305,9 +306,9 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     
   p <- ggplot() + 
     geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
     geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
-    #geom_smooth(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5, se = F) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
