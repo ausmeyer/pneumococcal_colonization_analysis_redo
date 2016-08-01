@@ -122,7 +122,9 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
     xlim(0, 1) +
     ylim(-1, 1) +
     theme_bw() +
-    theme(legend.position = c(0.5, 0.27), legend.title=element_blank())
+    theme(legend.position = c(0.5, 0.27), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   print(median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)]))
   
@@ -145,7 +147,9 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
     ylab("Youden index (sn + sp - 1)") +
     ylim(-1, 1) +
     theme_bw() +
-    theme(legend.position = c(0.5, 0.27), legend.title=element_blank())
+    theme(legend.position = c(0.5, 0.27), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   return(list(plot1 = p1, plot2 = p2, plot3 = p3))
 }
@@ -230,7 +234,9 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
     ylab("likelihood ratio") +
     scale_color_discrete(name = "") +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.35, 0.85), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   p2 <- ggplot() + 
     geom_segment(aes(x = 0, y = 1, xend = max(df$x.value), yend = 1), linetype = 2) +
@@ -243,7 +249,9 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
     ylab("likelihood ratio") +
     scale_color_discrete(name = "") +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.35, 0.85), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   return(list(plot1 = p1, plot2 = p2))
 }
@@ -280,7 +288,7 @@ make.continuous.likelihoodratio.plot <- function(df, df.raw, file.name, xaxis, p
     theme(legend.position = "none")
   
   df.raw.tmp <- df.raw
-  lapply(seq(0.01, 0.99, length = 10), function(x) df.raw.tmp <<- generate.continuous.lr(df.raw.tmp, fit, x))
+  lapply(seq(0.05, 0.95, length = 18), function(x) df.raw.tmp <<- generate.continuous.lr(df.raw.tmp, fit, x))
   
   df.raw.tmp <- df.raw.tmp[, c(-1, -3, -4)]
   colnames(df.raw.tmp)[1] <- 'x.value'
@@ -317,7 +325,8 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     xlab(xaxis) +
     ylab("probability pneumococcal") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'posttest prob. positive', c = 'posttest prob. negative')) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.background = element_rect(fill=alpha('white', 0.0)))
   
   print(min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]))
   print(max(prob.diff$pos.prob - prob.diff$neg.prob))
@@ -372,7 +381,9 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylab("probability pneumococcal") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.35, 0.85), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
   fit <- make.fit(df.raw)
@@ -396,7 +407,9 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylab("probability pneumococcal") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.35, 0.85), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   generate.continuous.lr <- function(tmp.df, tmp.fit, tmp.pretest) {
     x.1 <- (log(tmp.pretest / (1 - tmp.pretest)) - (tmp.fit[['pneumo.fit']])[["coefficients"]][[1]]) / (tmp.fit[['pneumo.fit']])[["coefficients"]][[2]]
@@ -422,7 +435,9 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylab("probability pneumococcal") +
     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'continuous posttest probability')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
+    theme(legend.position = c(0.35, 0.85), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
   
   return(list(plot1 = p1, plot2 = p2))
 }
