@@ -78,8 +78,6 @@ make.fit <- function(df) {
   pneumo.fit <- glm(factor(pneumo) ~ variable, data = df, family = "binomial")
   predicted.pneumo <- predict(pneumo.fit, type="response", se = TRUE)
   
-  a <<- pneumo.fit
-  
   return(list(predicted = data.frame(bacter = predicted.bacteremia, pneumo = predicted.pneumo), bacter.fit = bacter.fit, pneumo.fit = pneumo.fit))
 }
 
@@ -359,14 +357,14 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
   prob.diff <- calc.prob.difference(df, pretest)
 
-  combined.probability <- (pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg / ((pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg + 1)
+  combined.probability <- (pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg / 
+    ((pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg + 1)
   
   df <- cbind(df, combined.probability)
     
   p1 <- ggplot() + 
     geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
     geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
-    #geom_smooth(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5, span = 1) +
     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
     geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
@@ -378,6 +376,27 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   
   df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
   fit <- make.fit(df.raw)
+  pneumo.theoretical <- round(fit[["predicted"]][["pneumo.fit"]], digits = 0)
+  bacter.theoretical <- round(fit[["predicted"]][["bacter.fit"]], digits = 0)
+  df.theoretical <- make.test.stats.df(data.frame(variable = df.raw$variable, pneumo = pneumo.theoretical, bacter = bacter.theoretical), "pneumo")
+  prob.diff.theoretical <- calc.prob.difference(df.theoretical, pretest)
+
+  combined.probability.theoretical <- (pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg / 
+    ((pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg + 1)
+  
+  df.theoretical <- cbind(df.theoretical, combined.probability.theoretical)
+  
+  p4 <- ggplot() + 
+    geom_segment(aes(x = 0, y = pretest, xend = max(df.theoretical$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = df.theoretical, aes(x = x.value, y = combined.probability.theoretical, color = "b"), size = 0.5) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df.theoretical$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+    ylim(0, 1) + 
+    xlab(xaxis) +
+    ylab("probability pneumococcal") +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
+    theme_bw() +
+    theme(legend.position = c(0.35, 0.85), legend.title=element_blank())
   
   generate.continuous.lr <- function(tmp.df, tmp.fit, tmp.pretest) {
     x.1 <- (log(tmp.pretest / (1 - tmp.pretest)) - (tmp.fit[['pneumo.fit']])[["coefficients"]][[1]]) / (tmp.fit[['pneumo.fit']])[["coefficients"]][[2]]
