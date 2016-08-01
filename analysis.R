@@ -126,7 +126,7 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
-  print(median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)]))
+  #print(median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)]))
   
   p3 <- ggplot() + 
     geom_line(data = df, aes(x = x.value, y = df$sens + df$spec - 1, color = 'Youden index'), size = 1) +
@@ -163,6 +163,9 @@ make.logistic.plot <- function(df, df.roc, file.name, xaxis, pretest) {
   
   fit.df <- (make.fit(df))[["predicted"]]
   new.df <- data.frame(variable = df$variable, bacter = df$bacter, prob.bacter = fit.df$bacter.fit, pneumo = df$pneumo, prob.pneumo = fit.df$pneumo.fit)
+  
+  print(summary(make.fit(df)[["pneumo.fit"]]))
+  print(nrow(df))
   
   p <- ggplot() + 
     geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "diagnostic status")) +
@@ -328,8 +331,8 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     theme_bw() +
     theme(legend.background = element_rect(fill=alpha('white', 0.0)))
   
-  print(min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]))
-  print(max(prob.diff$pos.prob - prob.diff$neg.prob))
+  #print(min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]))
+  #print(max(prob.diff$pos.prob - prob.diff$neg.prob))
   
   p2 <- ggplot() + 
     geom_point(data = df, aes(x = x.value, 
@@ -462,7 +465,7 @@ p.continuous.lr.lytA <- make.continuous.likelihoodratio.plot(df = roc.data.lytA,
 p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
 p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
 
-print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
+#print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
 
 ## pct setup
 pct.filename <- 'pct.pdf'
@@ -481,7 +484,7 @@ p.continuous.lr.pct <- make.continuous.likelihoodratio.plot(df = roc.data.pct, d
 p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
 p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
 
-print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
+#print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
 
 ## crp setup
 crp.filename <- 'crp.pdf'
@@ -500,7 +503,7 @@ p.continuous.lr.crp <- make.continuous.likelihoodratio.plot(df = roc.data.crp, d
 p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
 p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
 
-print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
+#print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
 
 p.log <- plot_grid(p.log.crp$plot, p.log.pct$plot, p.log.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
 ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 3, width = 15)
