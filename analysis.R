@@ -126,7 +126,8 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
-  #print(median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)]))
+  print(paste("Optimal false positive rate: ", round((1 - median((df$spec)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)])), digits = 2)), sep = '')
+  print(paste("Optimal concentration: ", median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)])), sep = '')
   
   p3 <- ggplot() + 
     geom_line(data = df, aes(x = x.value, y = df$sens + df$spec - 1, color = 'Youden index'), size = 1) +
@@ -164,8 +165,8 @@ make.logistic.plot <- function(df, df.roc, file.name, xaxis, pretest) {
   fit.df <- (make.fit(df))[["predicted"]]
   new.df <- data.frame(variable = df$variable, bacter = df$bacter, prob.bacter = fit.df$bacter.fit, pneumo = df$pneumo, prob.pneumo = fit.df$pneumo.fit)
   
-  print(summary(make.fit(df)[["pneumo.fit"]]))
-  print(nrow(df))
+  #print(summary(make.fit(df)[["pneumo.fit"]]))
+  #print(nrow(df))
   
   p <- ggplot() + 
     geom_point(data = new.df, aes(x = variable, y = as.numeric(as.character(pneumo)), color = "diagnostic status")) +
@@ -382,9 +383,9 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
-    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), 
+    theme(legend.position = c(0.29, 0.86), 
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
@@ -395,25 +396,25 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   df.theoretical <- make.test.stats.df(data.frame(variable = df.raw$variable, pneumo = pneumo.theoretical, bacter = bacter.theoretical), "pneumo")
   prob.diff.theoretical <- calc.prob.difference(df.theoretical, pretest)
 
-  combined.probability.theoretical <- (pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg / 
-    ((pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg + 1)
-  
-  df.theoretical <- cbind(df.theoretical, combined.probability.theoretical)
-  
-  p4 <- ggplot() + 
-    geom_segment(aes(x = 0, y = pretest, xend = max(df.theoretical$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = df.theoretical, aes(x = x.value, y = combined.probability.theoretical, color = "b"), size = 0.5) +
-    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
-    geom_point(data = data.frame(x = max(df.theoretical$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
-    ylim(0, 1) + 
-    xlab(xaxis) +
-    ylab("probability pneumococcal") +
-    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
-    theme_bw() +
-    theme(legend.position = c(0.35, 0.85), 
-          legend.title=element_blank(),
-          legend.background = element_rect(fill = alpha('white', 0.0)))
-  
+#   combined.probability.theoretical <- (pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg / 
+#     ((pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg + 1)
+#   
+#   df.theoretical <- cbind(df.theoretical, combined.probability.theoretical)
+#   
+#   p4 <- ggplot() + 
+#     geom_segment(aes(x = 0, y = pretest, xend = max(df.theoretical$x.value), yend = pretest, color = 'a'), linetype = 2) +
+#     geom_point(data = df.theoretical, aes(x = x.value, y = combined.probability.theoretical, color = "b"), size = 0.5) +
+#     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+#     geom_point(data = data.frame(x = max(df.theoretical$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+#     ylim(0, 1) + 
+#     xlab(xaxis) +
+#     ylab("probability pneumococcal") +
+#     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
+#     theme_bw() +
+#     theme(legend.position = c(0.35, 0.85), 
+#           legend.title=element_blank(),
+#           legend.background = element_rect(fill = alpha('white', 0.0)))
+#   
   generate.continuous.lr <- function(tmp.df, tmp.fit, tmp.pretest) {
     x.1 <- (log(tmp.pretest / (1 - tmp.pretest)) - (tmp.fit[['pneumo.fit']])[["coefficients"]][[1]]) / (tmp.fit[['pneumo.fit']])[["coefficients"]][[2]]
     tmp.lr.continuous <- exp((tmp.fit[['pneumo.fit']])[["coefficients"]][[2]] * (tmp.df$variable - x.1))
@@ -436,13 +437,28 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
-    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'continuous posttest probability')) +
+    scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'continuous posttest')) +
     theme_bw() +
-    theme(legend.position = c(0.35, 0.85), 
+    theme(legend.position = c(0.29, 0.86), 
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
-  return(list(plot1 = p1, plot2 = p2))
+  p3 <- ggplot() + 
+    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
+    geom_point(data = df.raw.tmp, aes(x = x.value, y = y.value, color = "c"), size = 0.5) +
+    geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+    ylim(0, 1) + 
+    xlab(xaxis) +
+    ylab("probability pneumococcal") +
+    scale_color_discrete(name = "", labels = c(a = 'pretest', b = 'combined', c = 'continuous')) +
+    theme_bw() +
+    theme(legend.position = c(0.2, 0.82), 
+          legend.title=element_blank(),
+          legend.background = element_rect(fill = alpha('white', 0.0)))
+  
+  return(list(plot1 = p1, plot2 = p2, plot3 = p3))
 }
 
 raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
@@ -488,8 +504,9 @@ p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = ro
 
 ## crp setup
 crp.filename <- 'crp.pdf'
-crp.xaxis <- 'c-reactive protein concentration (mg/L)'
+crp.xaxis <- 'c-reactive protein concentration (mg/dL)'
 raw.crp <- import.data(variable = 'CRP')
+raw.crp$variable <- raw.crp$variable/10
 
 ## Plot crp
 roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
@@ -536,5 +553,6 @@ ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
 
 p.combined.prob <- plot_grid(p.combined.prob.crp$plot1, p.combined.prob.pct$plot1, p.combined.prob.lytA$plot1, 
                              p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
-                             labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
-ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 7.5, width = 12)
+                             p.combined.prob.crp$plot3, p.combined.prob.pct$plot3, p.combined.prob.lytA$plot3,
+                             labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), ncol = 3)
+ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 9.5, width = 10.5)
