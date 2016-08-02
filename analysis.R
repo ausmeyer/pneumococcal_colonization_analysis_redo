@@ -531,7 +531,7 @@ p.roc <- plot_grid(p.roc.crp$plot1, p.roc.pct$plot1, p.roc.lytA$plot1,
                    labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), 
                    ncol = 3,
                    scale = 0.95)
-ggsave(plot = p.roc, filename = 'rocs.pdf', height = 9.5, width = 10.5)
+ggsave(plot = p.roc, filename = 'rocs.pdf', height = 10.5, width = 11.5)
 
 p.sens.spec <- plot_grid(p.sens.spec.crp$plot, p.sens.spec.pct$plot, p.sens.spec.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
 ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 3, width = 15)
@@ -555,4 +555,4 @@ p.combined.prob <- plot_grid(p.combined.prob.crp$plot1, p.combined.prob.pct$plot
                              p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
                              p.combined.prob.crp$plot3, p.combined.prob.pct$plot3, p.combined.prob.lytA$plot3,
                              labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), ncol = 3)
-ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 9.5, width = 10.5)
+ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 10.5, width = 11.5)
