@@ -22,6 +22,7 @@ calc.prob.difference <- function(df, pretest) {
   
   return(data.frame(lr.pos = lr.pos, lr.neg = lr.neg, pos.prob = pos.prob, neg.prob = neg.prob))
 }
+
 generate.matrix <- function(df, cutoff, variable, response) {
   t.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 1))
   f.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 0))
@@ -39,6 +40,10 @@ calculate.test.stats <- function(df) {
   return(data.frame(sens = sensitivity, spec = specificity, sigma2.pos = sigma2.pos, sigma2.neg = sigma2.neg))
 }
 
+calculate.empiric.lr <- function(df) {
+  return(df$t.p * df$t.n / (df$t.p^2 + 2*df$f.n*df$t.p + df$f.n^2) / df$f.p / df$f.n)
+}
+
 make.test.stats.df <- function(df, which.variable) {
   #df.series <- seq(0, max(df$variable), length = 1000)
   df.series <- df$variable[order(df$variable)]
@@ -46,6 +51,16 @@ make.test.stats.df <- function(df, which.variable) {
   invisible(sapply(df.series, function(x) df.stats <<- rbind(df.stats, (calculate.test.stats(generate.matrix(df, cutoff = x, variable = "variable", response = which.variable))))))
   df.stats <- cbind(x.value = df.series, df.stats)
   
+  return(df.stats)
+}
+
+make.empiric.lr.df <- function(df, which.variable) {
+  df.series <- df$variable[order(df$variable)]
+  df.stats <- data.frame()
+  invisible(sapply(df.series, function(x) df.stats <<- rbind(df.stats, (calculate.empiric.lr(generate.matrix(df, cutoff = x, variable = "variable", response = which.variable))))))
+  df.stats <- cbind(x.value = df.series, df.stats)
+  colnames(df.stats)[2] <- 'y.value'
+
   return(df.stats)
 }
 
@@ -369,12 +384,14 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   prob.diff <- calc.prob.difference(df, pretest)
   df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
   prob.diff <- calc.prob.difference(df, pretest)
-
+  df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
+  fit <- make.fit(df.raw)
+  
   combined.probability <- (pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg / 
     ((pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg + 1)
   
   df <- cbind(df, combined.probability)
-    
+  
   p1 <- ggplot() + 
     geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
     geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
@@ -389,32 +406,6 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
-  df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
-  fit <- make.fit(df.raw)
-  pneumo.theoretical <- round(fit[["predicted"]][["pneumo.fit"]], digits = 0)
-  bacter.theoretical <- round(fit[["predicted"]][["bacter.fit"]], digits = 0)
-  df.theoretical <- make.test.stats.df(data.frame(variable = df.raw$variable, pneumo = pneumo.theoretical, bacter = bacter.theoretical), "pneumo")
-  prob.diff.theoretical <- calc.prob.difference(df.theoretical, pretest)
-
-#   combined.probability.theoretical <- (pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg / 
-#     ((pretest / (1 - pretest)) * prob.diff.theoretical$lr.pos * prob.diff.theoretical$lr.neg + 1)
-#   
-#   df.theoretical <- cbind(df.theoretical, combined.probability.theoretical)
-#   
-#   p4 <- ggplot() + 
-#     geom_segment(aes(x = 0, y = pretest, xend = max(df.theoretical$x.value), yend = pretest, color = 'a'), linetype = 2) +
-#     geom_point(data = df.theoretical, aes(x = x.value, y = combined.probability.theoretical, color = "b"), size = 0.5) +
-#     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
-#     geom_point(data = data.frame(x = max(df.theoretical$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
-#     ylim(0, 1) + 
-#     xlab(xaxis) +
-#     ylab("probability pneumococcal") +
-#     scale_color_discrete(name = "", labels = c(a = 'pretest probability', b = 'combined posttest probability')) +
-#     theme_bw() +
-#     theme(legend.position = c(0.35, 0.85), 
-#           legend.title=element_blank(),
-#           legend.background = element_rect(fill = alpha('white', 0.0)))
-#   
   generate.continuous.lr <- function(tmp.df, tmp.fit, tmp.pretest) {
     x.1 <- (log(tmp.pretest / (1 - tmp.pretest)) - (tmp.fit[['pneumo.fit']])[["coefficients"]][[1]]) / (tmp.fit[['pneumo.fit']])[["coefficients"]][[2]]
     tmp.lr.continuous <- exp((tmp.fit[['pneumo.fit']])[["coefficients"]][[2]] * (tmp.df$variable - x.1))
@@ -460,7 +451,8 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   
   return(list(plot1 = p1, plot2 = p2, plot3 = p3))
 }
-
+a <- c()
+b <- c()
 raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
 pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
 
