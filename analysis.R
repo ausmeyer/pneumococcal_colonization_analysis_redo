@@ -60,7 +60,7 @@ make.empiric.lr.df <- function(df, which.variable) {
   invisible(sapply(df.series, function(x) df.stats <<- rbind(df.stats, (calculate.empiric.lr(generate.matrix(df, cutoff = x, variable = "variable", response = which.variable))))))
   df.stats <- cbind(x.value = df.series, df.stats)
   colnames(df.stats)[2] <- 'y.value'
-
+  
   return(df.stats)
 }
 
@@ -73,7 +73,7 @@ left.censor <- function(df) {
   df <- rbind(df, new.df)
 }
 
-import.data <- function(variable){
+import.data <- function(variable, variable2) {
   df <- read_excel('Database_BMJ_Open_25Jul2014.xlsx', col_types = c('text', 'text', 'numeric', 
                                                                      'numeric', 'numeric', 'text', 
                                                                      'text', 'numeric', 'numeric', 
@@ -82,8 +82,17 @@ import.data <- function(variable){
                                                                      'text', 'text', 'text', 
                                                                      'text'))
   df[, 1:17]
-  df <- data.frame(age = df$age, variable = df[[variable]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
-  df <- na.omit(df)
+  
+  if(missing(variable2)) {
+    df <- data.frame(age = df$age, variable = df[[variable]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
+    df <- na.omit(df)
+  }
+  else {
+    tmp.df <- data.frame(age = df$age, variable1 = df[[variable]], variable2 = df[[variable2]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
+    tmp.df <- na.omit(tmp.df)
+    df <- data.frame(age = tmp.df$age, variable = tmp.df$variable1/tmp.df$variable2, bacter = tmp.df$bacter, pneumo = tmp.df$pneumo)
+  }
+  return(df)
 }
 
 make.fit <- function(df) {
@@ -312,7 +321,7 @@ make.continuous.likelihoodratio.plot <- function(df, df.raw, file.name, xaxis, p
   df.raw.tmp <- df.raw.tmp[, c(-1, -3, -4)]
   colnames(df.raw.tmp)[1] <- 'x.value'
   df.raw.tmp <- melt(df.raw.tmp, id = c('x.value'))
-
+  
   p2 <- ggplot() + 
     geom_segment(data = df.raw.tmp, aes(x = 0, y = 1, xend = max(x.value), yend = 1), linetype = 2) +
     geom_point(data = df.raw.tmp, aes(x = x.value, y = value, color = variable), size = 0.5) +
@@ -451,100 +460,129 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
   
   return(list(plot1 = p1, plot2 = p2, plot3 = p3))
 }
-a <- c()
-b <- c()
-raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
-pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
 
-## lytA setup
-lytA.filename <- 'lytA.pdf'
-lytA.xaxis <- 'lytA density (log10 copies/mL)'
-raw.lytA <- import.data(variable = 'lytA_NP')
-
-## Plot lytA
-roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
-
-p.log.lytA <- make.logistic.plot(df = raw.lytA, df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-p.roc.lytA <- make.roc.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-
-p.sens.spec.lytA <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-p.lr.lytA <- make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-p.continuous.lr.lytA <- make.continuous.likelihoodratio.plot(df = roc.data.lytA, df.raw = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-
-#print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
-
-## pct setup
-pct.filename <- 'pct.pdf'
-pct.xaxis <- 'procalcitonin concentration (ng/mL)'
-raw.pct <- import.data(variable = 'PCT')
-
-## Plot pct
-roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
-
-p.log.pct <- make.logistic.plot(df = raw.pct, df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-p.roc.pct <- make.roc.plot(df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-
-p.sens.spec.pct <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-p.lr.pct <- make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-p.continuous.lr.pct <- make.continuous.likelihoodratio.plot(df = roc.data.pct, df.raw = raw.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-
-#print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
-
-## crp setup
-crp.filename <- 'crp.pdf'
-crp.xaxis <- 'c-reactive protein concentration (mg/dL)'
-raw.crp <- import.data(variable = 'CRP')
-raw.crp$variable <- raw.crp$variable/10
-
-## Plot crp
-roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
-
-p.log.crp <- make.logistic.plot(df = raw.crp, df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-p.roc.crp <- make.roc.plot(df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-
-p.sens.spec.crp <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-p.lr.crp <- make.likelihoodratio.plot(roc.data.crp, crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-p.continuous.lr.crp <- make.continuous.likelihoodratio.plot(df = roc.data.crp, df.raw = raw.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-
-#print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
-
-p.log <- plot_grid(p.log.crp$plot, p.log.pct$plot, p.log.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 3, width = 15)
-
-p.roc <- plot_grid(p.roc.crp$plot1, p.roc.pct$plot1, p.roc.lytA$plot1, 
-                   p.roc.crp$plot2, p.roc.pct$plot2, p.roc.lytA$plot2, 
-                   p.roc.crp$plot3, p.roc.pct$plot3, p.roc.lytA$plot3, 
-                   labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), 
-                   ncol = 3,
-                   scale = 0.95)
-ggsave(plot = p.roc, filename = 'rocs.pdf', height = 10.5, width = 11.5)
-
-p.sens.spec <- plot_grid(p.sens.spec.crp$plot, p.sens.spec.pct$plot, p.sens.spec.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
-ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 3, width = 15)
-
-p.lr <- plot_grid(p.lr.crp$plot1, p.lr.pct$plot1, p.lr.lytA$plot1, 
-                  p.lr.crp$plot2,  p.lr.pct$plot2,p.lr.lytA$plot2, 
-                  labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
-ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 7.5, width = 12)
-
-p.continuous.lr <- plot_grid(p.continuous.lr.crp$plot1, p.continuous.lr.pct$plot1, p.continuous.lr.lytA$plot1, 
-                             p.continuous.lr.crp$plot2, p.continuous.lr.pct$plot2, p.continuous.lr.lytA$plot2,
-                             labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
-ggsave(plot = p.continuous.lr, filename = "continuous_likelihood_ratios.pdf", height = 7.5, width = 12)
-
-p.prob <- plot_grid(p.prob.crp$plot1, p.prob.pct$plot1, p.prob.lytA$plot1, 
-                    p.prob.crp$plot2, p.prob.pct$plot2, p.prob.lytA$plot2, 
+## Avoid global variable by running a main function
+run.main.analysis <- function() {
+  raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
+  pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
+  
+  ## lytA setup
+  lytA.filename <- 'lytA.pdf'
+  lytA.xaxis <- 'lytA density (log10 copies/mL)'
+  raw.lytA <- import.data(variable = 'lytA_NP')
+  
+  ## Plot lytA
+  roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
+  
+  p.log.lytA <- make.logistic.plot(df = raw.lytA, df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.roc.lytA <- make.roc.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  
+  p.sens.spec.lytA <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.lr.lytA <- make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.continuous.lr.lytA <- make.continuous.likelihoodratio.plot(df = roc.data.lytA, df.raw = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  
+  #print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
+  
+  ## pct setup
+  pct.filename <- 'pct.pdf'
+  pct.xaxis <- 'procalcitonin concentration (ng/mL)'
+  raw.pct <- import.data(variable = 'PCT')
+  
+  ## Plot pct
+  roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
+  
+  p.log.pct <- make.logistic.plot(df = raw.pct, df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.roc.pct <- make.roc.plot(df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  
+  p.sens.spec.pct <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.lr.pct <- make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.continuous.lr.pct <- make.continuous.likelihoodratio.plot(df = roc.data.pct, df.raw = raw.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  
+  #print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
+  
+  ## crp setup
+  crp.filename <- 'crp.pdf'
+  crp.xaxis <- 'c-reactive protein concentration (mg/dL)'
+  raw.crp <- import.data(variable = 'CRP')
+  raw.crp$variable <- raw.crp$variable/10
+  
+  ## Plot crp
+  roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
+  
+  p.log.crp <- make.logistic.plot(df = raw.crp, df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.roc.crp <- make.roc.plot(df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  
+  p.sens.spec.crp <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.lr.crp <- make.likelihoodratio.plot(roc.data.crp, crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.continuous.lr.crp <- make.continuous.likelihoodratio.plot(df = roc.data.crp, df.raw = raw.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  
+  #print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
+  
+  p.log <- plot_grid(p.log.crp$plot, p.log.pct$plot, p.log.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+  ggsave(plot = p.log, filename = "logistic_fits.pdf", height = 3, width = 15)
+  
+  p.roc <- plot_grid(p.roc.crp$plot1, p.roc.pct$plot1, p.roc.lytA$plot1, 
+                     p.roc.crp$plot2, p.roc.pct$plot2, p.roc.lytA$plot2, 
+                     p.roc.crp$plot3, p.roc.pct$plot3, p.roc.lytA$plot3, 
+                     labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), 
+                     ncol = 3,
+                     scale = 0.95)
+  ggsave(plot = p.roc, filename = 'rocs.pdf', height = 10.5, width = 11.5)
+  
+  p.sens.spec <- plot_grid(p.sens.spec.crp$plot, p.sens.spec.pct$plot, p.sens.spec.lytA$plot, labels = c('A', 'B', 'C'), ncol = 3)
+  ggsave(plot = p.sens.spec, filename = "sensitivities_specificities.pdf", height = 3, width = 15)
+  
+  p.lr <- plot_grid(p.lr.crp$plot1, p.lr.pct$plot1, p.lr.lytA$plot1, 
+                    p.lr.crp$plot2,  p.lr.pct$plot2,p.lr.lytA$plot2, 
                     labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
-ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
+  ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 7.5, width = 12)
+  
+  p.continuous.lr <- plot_grid(p.continuous.lr.crp$plot1, p.continuous.lr.pct$plot1, p.continuous.lr.lytA$plot1, 
+                               p.continuous.lr.crp$plot2, p.continuous.lr.pct$plot2, p.continuous.lr.lytA$plot2,
+                               labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
+  ggsave(plot = p.continuous.lr, filename = "continuous_likelihood_ratios.pdf", height = 7.5, width = 12)
+  
+  p.prob <- plot_grid(p.prob.crp$plot1, p.prob.pct$plot1, p.prob.lytA$plot1, 
+                      p.prob.crp$plot2, p.prob.pct$plot2, p.prob.lytA$plot2, 
+                      labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
+  ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
+  
+  p.combined.prob <- plot_grid(p.combined.prob.crp$plot1, p.combined.prob.pct$plot1, p.combined.prob.lytA$plot1, 
+                               p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
+                               p.combined.prob.crp$plot3, p.combined.prob.pct$plot3, p.combined.prob.lytA$plot3,
+                               labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), ncol = 3)
+  ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 10.5, width = 11.5)
+}
 
-p.combined.prob <- plot_grid(p.combined.prob.crp$plot1, p.combined.prob.pct$plot1, p.combined.prob.lytA$plot1, 
-                             p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
-                             p.combined.prob.crp$plot3, p.combined.prob.pct$plot3, p.combined.prob.lytA$plot3,
-                             labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), ncol = 3)
-ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 10.5, width = 11.5)
+run.two.variable.analysis <- function() {
+  raw.pneumo <- import.data(variable = "Pneumococcal_diagnosis")
+  pretest.probability <- calc.pretest(raw.pneumo, 'pneumo')
+  
+  ## lytA setup
+  lytA.pct.filename <- 'lytA_pct.pdf'
+  lytA.pct.xaxis <- 'lytA/PCT)'
+  raw.lytA.pct <- import.data(variable = 'PCT', variable2 = 'CRP')
+  
+  ## Plot lytA
+  roc.data.lytA.pct <- make.test.stats.df(df = raw.lytA.pct, which.variable = "pneumo")
+  
+  p.log.lytA.pct <- make.logistic.plot(df = raw.lytA.pct, df.roc = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.roc.lytA.pct <- make.roc.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  
+  p.sens.spec.lytA.pct <- make.sens.spec.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.lr.lytA.pct <- make.likelihoodratio.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.continuous.lr.lytA.pct <- make.continuous.likelihoodratio.plot(df = roc.data.lytA.pct, df.raw = raw.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.prob.lytA.pct <- make.probability.plots(df.raw = raw.lytA.pct, df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.combined.prob.lytA.pct <- make.combined.probability.plots(df.raw = raw.lytA.pct, df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  
+  show(p.roc.lytA.pct)
+}
+
+
+run.main.analysis()
