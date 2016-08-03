@@ -172,7 +172,7 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
 
 make.logistic.plot <- function(df, df.roc, file.name, xaxis, pretest) {
   prob.diff <- calc.prob.difference(df.roc, pretest)
-  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  #df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
   prob.diff <- calc.prob.difference(df.roc, pretest)
   
   df <- df[df$variable <= max(df.roc$x.value), ]
@@ -347,7 +347,7 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     theme_bw() +
     theme(legend.background = element_rect(fill=alpha('white', 0.0)))
   
-  #print(min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]))
+  print(paste("Optimal Bayesian value: ", min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)])), sep = '')
   #print(max(prob.diff$pos.prob - prob.diff$neg.prob))
   
   p2 <- ggplot() + 
