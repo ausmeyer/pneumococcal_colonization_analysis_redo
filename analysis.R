@@ -1,6 +1,6 @@
 ## Clear workspace and set working directory
 rm(list = ls())
-setwd('~/Google Drive/Documents/PostPostDoc/pneumococcal_colonization_analysis_redo/')
+setwd('~/Google Drive/Documents/PostPostDoc/pneumococcal_diagnosis_project/pneumococcal_colonization_analysis_redo/')
 
 ## Library Imports
 libraries.call <- c("dplyr", 'tidyr', "ggplot2", "readxl", "reshape", 'cowplot')
@@ -74,14 +74,26 @@ left.censor <- function(df) {
 }
 
 import.data <- function(variable, variable2) {
-  df <- read_excel('Database_BMJ_Open_25Jul2014.xlsx', col_types = c('text', 'text', 'numeric', 
-                                                                     'numeric', 'numeric', 'text', 
-                                                                     'text', 'numeric', 'numeric', 
-                                                                     'numeric', 'numeric', 'numeric', 
-                                                                     'numeric', 'numeric', 'text', 
-                                                                     'text', 'text', 'text', 
-                                                                     'text'))
-  df[, 1:17]
+  df <- read_csv('data.csv', 
+                 col_types = cols(
+                   study_ID = col_character(),
+                   Gender = col_character(),
+                   age = col_integer(),
+                   Bartlett_Score = col_integer(),
+                   CD4_count = col_integer(),
+                   Bactrim = col_integer(),
+                   HAART = col_integer(),
+                   CURB65 = col_integer(),
+                   MR_proANP = col_double(),
+                   MR_proADM = col_double(),
+                   MR_proADM = col_double(),
+                   PCT = col_double(),
+                   CRP = col_double(),
+                   lytA_NP = col_double(),
+                   bacteremia = col_double(),
+                   Pneumococcal_diagnosis = col_integer(),
+                   Pneumococcal_diagnosis_expanded = col_integer()
+                 ))
   
   if(missing(variable2)) {
     df <- data.frame(age = df$age, variable = df[[variable]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
