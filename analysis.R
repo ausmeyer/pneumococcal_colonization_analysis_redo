@@ -3,7 +3,7 @@ rm(list = ls())
 setwd('~/Google Drive/Documents/PostPostDoc/pneumococcal_diagnosis_project/pneumococcal_colonization_analysis_redo/')
 
 ## Library Imports
-libraries.call <- c("dplyr", 'tidyr', "ggplot2", "readxl", "reshape", 'cowplot')
+libraries.call <- c("dplyr", 'tidyr', "ggplot2", "readr", "reshape", 'cowplot')
 lapply(libraries.call, require, character.only = TRUE)
 
 ## Utility Functions
@@ -556,9 +556,8 @@ run.main.analysis <- function() {
   ggsave(plot = p.lr, filename = "likelihood_ratios.pdf", height = 7.5, width = 12)
   
   p.continuous.lr <- plot_grid(p.continuous.lr.crp$plot1, p.continuous.lr.pct$plot1, p.continuous.lr.lytA$plot1, 
-                               p.continuous.lr.crp$plot2, p.continuous.lr.pct$plot2, p.continuous.lr.lytA$plot2,
-                               labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
-  ggsave(plot = p.continuous.lr, filename = "continuous_likelihood_ratios.pdf", height = 7.5, width = 12)
+                               labels = c('A', 'B', 'C'), ncol = 3)
+  ggsave(plot = p.continuous.lr, filename = "continuous_likelihood_ratios.pdf", height = 3, width = 10)
   
   p.prob <- plot_grid(p.prob.crp$plot1, p.prob.pct$plot1, p.prob.lytA$plot1, 
                       p.prob.crp$plot2, p.prob.pct$plot2, p.prob.lytA$plot2, 
@@ -578,7 +577,7 @@ run.two.variable.analysis <- function() {
   
   ## lytA setup
   lytA.pct.filename <- 'lytA_pct.pdf'
-  lytA.pct.xaxis <- 'lytA/PCT)'
+  lytA.pct.xaxis <- 'lytA/PCT'
   raw.lytA.pct <- import.data(variable = 'PCT', variable2 = 'CRP')
   
   ## Plot lytA
