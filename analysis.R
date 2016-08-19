@@ -26,8 +26,8 @@ calc.prob.difference <- function(df, pretest) {
 generate.matrix <- function(df, cutoff, variable, response) {
   t.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 1))
   f.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 0))
-  f.negative <- sum(df[[variable]] < cutoff & as.numeric(as.character(df[[response]]) == 1))
-  t.negative <- sum(df[[variable]] < cutoff & as.numeric(as.character(df[[response]]) == 0))
+  f.negative <- sum(df[[variable]] <= cutoff & as.numeric(as.character(df[[response]]) == 1))
+  t.negative <- sum(df[[variable]] <= cutoff & as.numeric(as.character(df[[response]]) == 0))
   return(data.frame(t.p = t.positive, f.p = f.positive, f.n = f.negative, t.n = t.negative))
 }
 
