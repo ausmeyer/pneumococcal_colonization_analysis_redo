@@ -26,8 +26,8 @@ calc.prob.difference <- function(df, pretest) {
 generate.matrix <- function(df, cutoff, variable, response) {
   t.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 1))
   f.positive <- sum(df[[variable]] > cutoff & as.numeric(as.character(df[[response]]) == 0))
-  f.negative <- sum(df[[variable]] <= cutoff & as.numeric(as.character(df[[response]]) == 1))
-  t.negative <- sum(df[[variable]] <= cutoff & as.numeric(as.character(df[[response]]) == 0))
+  f.negative <- sum(df[[variable]] < cutoff & as.numeric(as.character(df[[response]]) == 1))
+  t.negative <- sum(df[[variable]] < cutoff & as.numeric(as.character(df[[response]]) == 0))
   return(data.frame(t.p = t.positive, f.p = f.positive, f.n = f.negative, t.n = t.negative))
 }
 
@@ -36,8 +36,8 @@ calculate.test.stats <- function(df) {
   specificity <- df$t.n / (df$t.n + df$f.p)
   sigma2.pos <- (1 / df$t.p) - (1 / (df$t.p + df$f.n)) + (1 / df$f.p) - (1 / (df$f.p + df$t.n))
   sigma2.neg <- (1 / df$f.n) - (1 / (df$t.p + df$f.n)) + (1 / df$t.n) - (1 / (df$f.p + df$t.n))
-  
-  return(data.frame(sens = sensitivity, spec = specificity, sigma2.pos = sigma2.pos, sigma2.neg = sigma2.neg))
+
+  return(data.frame(sens = sensitivity, spec = specificity, sigma2.pos = sigma2.pos, sigma2.neg = sigma2.neg, t.p = df$t.p, t.n = df$t.n, f.p = df$f.p, f.n = df$f.n))
 }
 
 calculate.empiric.lr <- function(df) {
@@ -45,11 +45,13 @@ calculate.empiric.lr <- function(df) {
 }
 
 make.test.stats.df <- function(df, which.variable) {
-  #df.series <- seq(0, max(df$variable), length = 1000)
   df.series <- df$variable[order(df$variable)]
   df.stats <- data.frame()
   invisible(sapply(df.series, function(x) df.stats <<- rbind(df.stats, (calculate.test.stats(generate.matrix(df, cutoff = x, variable = "variable", response = which.variable))))))
   df.stats <- cbind(x.value = df.series, df.stats)
+  
+  #Adjust minimum counts here
+  df.stats <- df.stats[df.stats$t.p >= 0 & df.stats$t.n >= 0 & df.stats$f.p >= 0 & df.stats$f.n >= 0, ]
   
   return(df.stats)
 }
@@ -72,6 +74,10 @@ left.censor <- function(df) {
   lapply(1:(nrow(df)-1), function(x) new.df <<- rbind(new.df, data.frame(x = df$x[x+1], y = df$y[x])))
   df <- rbind(df, new.df)
 }
+
+##############################
+# End of accessory functions #
+##############################
 
 import.data <- function(variable, variable2) {
   df <- read_csv('data.csv', 
@@ -96,8 +102,12 @@ import.data <- function(variable, variable2) {
                  ))
   
   if(missing(variable2)) {
+    df <- df[order(df[[variable]]), ]
+    
     df <- data.frame(age = df$age, variable = df[[variable]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
     df <- na.omit(df)
+    
+    df <- df[(nrow(df) * 0.025):(nrow(df) * 0.975), ]
   }
   else {
     tmp.df <- data.frame(age = df$age, variable1 = df[[variable]], variable2 = df[[variable2]], bacter = df$bacteremia, pneumo = df$Pneumococcal_diagnosis)
@@ -564,11 +574,11 @@ run.main.analysis <- function() {
                       labels = c('A', 'B', 'C', 'D', 'E', 'F'), ncol = 3)
   ggsave(plot = p.prob, filename = "probabilities.pdf", height = 6, width = 16)
   
-  p.combined.prob <- plot_grid(p.combined.prob.crp$plot1, p.combined.prob.pct$plot1, p.combined.prob.lytA$plot1, 
-                               p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
+  p.combined.prob <- plot_grid(#p.combined.prob.crp$plot1, p.combined.prob.pct$plot1, p.combined.prob.lytA$plot1, 
+                               #p.combined.prob.crp$plot2, p.combined.prob.pct$plot2, p.combined.prob.lytA$plot2,
                                p.combined.prob.crp$plot3, p.combined.prob.pct$plot3, p.combined.prob.lytA$plot3,
-                               labels = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'), ncol = 3)
-  ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 10.5, width = 11.5)
+                               labels = c('A', 'B', 'C'), ncol = 3)
+  ggsave(plot = p.combined.prob, filename = "combined_probabilities.pdf", height = 3.5, width = 11.5)
 }
 
 run.two.variable.analysis <- function() {
