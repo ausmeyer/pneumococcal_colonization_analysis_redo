@@ -20,7 +20,10 @@ calc.prob.difference <- function(df, pretest) {
   pos.prob <- pos.odds / (1 + pos.odds)
   neg.prob <- neg.odds / (1 + neg.odds)
   
-  return(data.frame(lr.pos = lr.pos, lr.neg = lr.neg, pos.prob = pos.prob, neg.prob = neg.prob))
+  smoothed.pos.prob <- as.data.frame(predict(loess(data = data.frame(x = df$x.value, y = pos.prob), y ~ x, span = 0.5), data.frame(x = df$x.value)))[,1]
+  smoothed.neg.prob <- as.data.frame(predict(loess(data = data.frame(x = df$x.value, y = neg.prob), y ~ x, span = 0.5), data.frame(x = df$x.value)))[,1]
+  
+  return(data.frame(lr.pos = lr.pos, lr.neg = lr.neg, pos.prob = pos.prob, neg.prob = neg.prob, smoothed.pos.prob = smoothed.pos.prob, smoothed.neg.prob = smoothed.neg.prob))
 }
 
 generate.matrix <- function(df, cutoff, variable, response) {
@@ -128,12 +131,10 @@ make.fit <- function(df) {
 }
 
 ## Plotting Functions
-make.roc.plot <- function(df, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  #df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
-  
-  df.censored <- data.frame(x = 1 - df$spec, y = df$sens)
+make.roc.plot <- function(df.roc, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
+
+  df.censored <- data.frame(x = 1 - df.roc$spec, y = df.roc$sens)
   df.censored <- left.censor(df.censored)
   df.censored <- df.censored[order(df.censored$y), ]
   
@@ -149,16 +150,16 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
     theme(legend.position = "none")
   
   p2 <- ggplot() + 
-    geom_line(data = df, 
+    geom_line(data = df.roc, 
               aes(x = 1 - spec, y = sens + spec - 1, color = 'Youden index'), size = 1) +
-    geom_segment(data = df, 
+    geom_segment(data = df.roc, 
                  aes(x = min((1 - spec)[(sens + spec - 1) == max(sens + spec - 1)]), 
                      y = 0, 
                      xend = min((1 - spec)[(sens + spec - 1) == max(sens + spec - 1)]),
                      yend =  max(sens + spec - 1), 
                      color = 'optimal cutoff'),
                  size = 0.75) +
-    geom_point(data = df,
+    geom_point(data = df.roc,
                aes(x = min((1 - spec)[(sens + spec - 1) == max(sens + spec - 1)]), 
                    y = max(sens + spec - 1), 
                    color = 'optimal cutoff')) +
@@ -172,19 +173,19 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
           legend.title=element_blank(),
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
-  print(paste("Optimal false positive rate: ", round((1 - median((df$spec)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)])), digits = 2)), sep = '')
-  print(paste("Optimal concentration: ", median((df$x.value)[(df$sens + df$spec - 1) == max(df$sens + df$spec - 1)])), sep = '')
+  print(paste("Optimal false positive rate: ", round((1 - median((df.roc$spec)[(df.roc$sens + df.roc$spec - 1) == max(df.roc$sens + df.roc$spec - 1)])), digits = 2)), sep = '')
+  print(paste("Optimal concentration: ", median((df.roc$x.value)[(df.roc$sens + df.roc$spec - 1) == max(df.roc$sens + df.roc$spec - 1)])), sep = '')
   
   p3 <- ggplot() + 
-    geom_line(data = df, aes(x = x.value, y = df$sens + df$spec - 1, color = 'Youden index'), size = 1) +
-    geom_segment(data = df, 
+    geom_line(data = df.roc, aes(x = x.value, y = df.roc$sens + df.roc$spec - 1, color = 'Youden index'), size = 1) +
+    geom_segment(data = df.roc, 
                  aes(x = min((x.value)[(sens + spec - 1) == max(sens + spec - 1)]), 
                      y = 0, 
                      xend = min((x.value)[(sens + spec - 1) == max(sens + spec - 1)]),
                      yend =  max(sens + spec - 1), 
                      color = 'optimal cutoff'),
                  size = 0.75) +
-    geom_point(data = df, 
+    geom_point(data = df.roc, 
                aes(x = min((x.value)[(sens + spec - 1) == max(sens + spec - 1)]),
                    y =  max(sens + spec - 1),
                    color = 'optimal cutoff')
@@ -203,8 +204,9 @@ make.roc.plot <- function(df, file.name, xaxis, pretest) {
 
 make.logistic.plot <- function(df, df.roc, file.name, xaxis, pretest) {
   prob.diff <- calc.prob.difference(df.roc, pretest)
-  #df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df.roc, pretest)
+  prob.diff.tmp <- prob.diff[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  prob.diff <- prob.diff.tmp
   
   df <- df[df$variable <= max(df.roc$x.value), ]
   
@@ -225,12 +227,10 @@ make.logistic.plot <- function(df, df.roc, file.name, xaxis, pretest) {
   return(list(plot = p))
 }
 
-make.sens.spec.plot <- function(df, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  #df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
+make.sens.spec.plot <- function(df.roc, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
   
-  df.reformed <- melt(df, id = c("x.value"))
+  df.reformed <- melt(df.roc, id = c("x.value"))
   colnames(df.reformed) <- c('x', 'var', 'y')
   
   reformed.sens <- left.censor(filter(df.reformed, var == 'sens'))
@@ -252,33 +252,34 @@ make.sens.spec.plot <- function(df, file.name, xaxis, pretest) {
   return(list(plot = p, df.reformed = df.reformed))
 }
 
-make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
+make.likelihoodratio.plot <- function(df.roc, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
+  prob.diff.tmp <- prob.diff[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  prob.diff <- prob.diff.tmp
   
   alpha <- 0.05
   max.ribbon <- 15
   
-  lower.pos <- prob.diff$lr.pos * exp(-qnorm(1 - (alpha / 2)) * sqrt(df$sigma2.pos))
-  upper.pos <- prob.diff$lr.pos * exp(qnorm(1 - (alpha / 2)) * sqrt(df$sigma2.pos)) 
+  lower.pos <- prob.diff$lr.pos * exp(-qnorm(1 - (alpha / 2)) * sqrt(df.roc$sigma2.pos))
+  upper.pos <- prob.diff$lr.pos * exp(qnorm(1 - (alpha / 2)) * sqrt(df.roc$sigma2.pos)) 
   
-  lower.neg <- prob.diff$lr.neg * exp(-qnorm(1 - (alpha / 2)) * sqrt(df$sigma2.neg))
-  upper.neg <- prob.diff$lr.neg * exp(qnorm(1 - (alpha / 2)) * sqrt(df$sigma2.neg))
+  lower.neg <- prob.diff$lr.neg * exp(-qnorm(1 - (alpha / 2)) * sqrt(df.roc$sigma2.neg))
+  upper.neg <- prob.diff$lr.neg * exp(qnorm(1 - (alpha / 2)) * sqrt(df.roc$sigma2.neg))
   
   upper.pos[upper.pos > max.ribbon] <- max.ribbon
   upper.neg[upper.neg > max.ribbon] <- max.ribbon
   
-  df <- cbind(df, lr.pos = prob.diff$lr.pos, lr.neg = prob.diff$lr.neg, lower.pos, upper.pos, lower.neg, lower.pos)
+  df.roc <- cbind(df.roc, lr.pos = prob.diff$lr.pos, lr.neg = prob.diff$lr.neg, lower.pos, upper.pos, lower.neg, lower.pos)
   
   p1 <- ggplot() + 
-    geom_ribbon(data = df, aes(x = x.value, ymin = lower.pos, ymax=upper.pos), alpha = 0.2) +
-    geom_ribbon(data = df, aes(x = x.value, ymin = lower.neg, ymax=upper.neg), alpha = 0.2) +
-    geom_segment(aes(x = 0, y = 1, xend = max(df$x.value), yend = 1), linetype = 2) +
-    geom_point(data = df, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5) +
-    geom_point(data = df, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5) +
-    geom_smooth(data = df, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5, se = F) +
-    geom_smooth(data = df, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5, se = F) +
+    geom_ribbon(data = df.roc, aes(x = x.value, ymin = lower.pos, ymax=upper.pos), alpha = 0.2) +
+    geom_ribbon(data = df.roc, aes(x = x.value, ymin = lower.neg, ymax=upper.neg), alpha = 0.2) +
+    geom_segment(aes(x = 0, y = 1, xend = max(df.roc$x.value), yend = 1), linetype = 2) +
+    geom_point(data = df.roc, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5) +
+    geom_point(data = df.roc, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = lr.pos, color = 'LR positive'), span = 0.5, size = 0.5, se = F) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = lr.neg, color = 'LR negative'), span = 0.5, size = 0.5, se = F) +
     ylim(0, max.ribbon) + 
     xlab(xaxis) +
     ylab("likelihood ratio") +
@@ -289,11 +290,11 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
   p2 <- ggplot() + 
-    geom_segment(aes(x = 0, y = 1, xend = max(df$x.value), yend = 1), linetype = 2) +
-    geom_point(data = df, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5) +
-    geom_point(data = df, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5) +
-    geom_smooth(data = df, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5, se = F) +
-    geom_smooth(data = df, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5, se = F) +
+    geom_segment(aes(x = 0, y = 1, xend = max(df.roc$x.value), yend = 1), linetype = 2) +
+    geom_point(data = df.roc, aes(x = x.value, y = lr.pos, color = 'LR positive'), size = 0.5) +
+    geom_point(data = df.roc, aes(x = x.value, y = lr.neg, color = 'LR negative'), size = 0.5) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = lr.pos, color = 'LR positive'), span = 0.5, size = 0.5, se = F) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = lr.neg, color = 'LR negative'), span = 0.5, size = 0.5, se = F) +
     ylim(0, 10) +
     xlab(xaxis) +
     ylab("likelihood ratio") +
@@ -306,12 +307,13 @@ make.likelihoodratio.plot <- function(df, file.name, xaxis, pretest) {
   return(list(plot1 = p1, plot2 = p2))
 }
 
-make.continuous.likelihoodratio.plot <- function(df, df.raw, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
+make.continuous.likelihoodratio.plot <- function(df.roc, df.raw, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
+  prob.diff.tmp <- prob.diff[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  prob.diff <- prob.diff.tmp
   
-  df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
+  df.raw <- df.raw[df.raw$variable <= max(df.roc$x.value), ]
   fit <- make.fit(df.raw)
   
   generate.continuous.lr <- function(tmp.df, tmp.fit, tmp.pretest) {
@@ -357,20 +359,21 @@ make.continuous.likelihoodratio.plot <- function(df, df.raw, file.name, xaxis, p
   return(list(plot1 = p1, plot2 = p2))
 }
 
-make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
+make.probability.plots <- function(df.raw, df.roc, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
+  prob.diff.tmp <- prob.diff[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  prob.diff <- prob.diff.tmp
   
   p1 <- ggplot() + 
     #geom_vline(xintercept = 2) +
-    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = df, aes(x = x.value, y = prob.diff$pos.prob, color = "b"), size = 0.5) +
-    geom_point(data = df, aes(x = x.value, y = prob.diff$neg.prob, color = "c"), size = 0.5) +
-    geom_smooth(data = df, aes(x = x.value, y = prob.diff$pos.prob, color = "b"), size = 0.5, se = F) +
-    geom_smooth(data = df, aes(x = x.value, y = prob.diff$neg.prob, color = "c"), size = 0.5, se = F) +
+    geom_segment(aes(x = 0, y = pretest, xend = max(df.roc$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = df.roc, aes(x = x.value, y = prob.diff$pos.prob, color = "b"), size = 0.5) +
+    geom_point(data = df.roc, aes(x = x.value, y = prob.diff$neg.prob, color = "c"), size = 0.5) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = prob.diff$pos.prob, color = "b"), span = 0.5, size = 0.5, se = F) +
+    geom_smooth(data = df.roc, aes(x = x.value, y = prob.diff$neg.prob, color = "c"), span = 0.5, size = 0.5, se = F) +
     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
-    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df.roc$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
@@ -378,29 +381,30 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     theme_bw() +
     theme(legend.background = element_rect(fill=alpha('white', 0.0)))
   
-  print(paste("Optimal Bayesian value: ", min(df$x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)])), sep = '')
+  print(paste("Optimal Bayesian value: ", min(df.roc$x.value[(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob) == max(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)])), sep = '')
   #print(max(prob.diff$pos.prob - prob.diff$neg.prob))
   
   p2 <- ggplot() + 
-    geom_point(data = df, aes(x = x.value, 
+    geom_point(data = df.roc, aes(x = x.value, 
                               y = prob.diff$pos.prob - prob.diff$neg.prob, 
                               color = 'b'), 
                size = 0.5) +
-    geom_smooth(data = df, aes(x = x.value, 
+    geom_smooth(data = df.roc, aes(x = x.value, 
                                y = prob.diff$pos.prob - prob.diff$neg.prob, 
                                color = 'b'), 
+                span = 0.5, 
                 size = 0.5,
                 se = F) +
-    geom_segment(data = df, 
-                 aes(x = min(x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]), 
+    geom_segment(data = df.roc, 
+                 aes(x = min(x.value[(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob) == max(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)]), 
                      y = 0, 
-                     xend = min(x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]),
-                     yend =  max((prob.diff$pos.prob - prob.diff$neg.prob)), 
+                     xend = min(x.value[(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob) == max(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)]),
+                     yend =  max((prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)), 
                      color = 'a'),
                  size = 0.75) +
-    geom_point(data = df, 
-               aes(x = min(x.value[(prob.diff$pos.prob - prob.diff$neg.prob) == max(prob.diff$pos.prob - prob.diff$neg.prob)]),
-                   y =  max((prob.diff$pos.prob - prob.diff$neg.prob)),
+    geom_point(data = df.roc, 
+               aes(x = min(x.value[(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob) == max(prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)]),
+                   y =  max((prob.diff$smoothed.pos.prob - prob.diff$smoothed.neg.prob)),
                    color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
@@ -408,26 +412,28 @@ make.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
     scale_color_discrete(name = "", labels = c(a = 'optimal cutoff', b = 'probability difference')) +
     theme_bw()
   
-  return(list(plot1 = p1, plot2 = p2, df = df, prob.diff = prob.diff$pos.prob - prob.diff$neg.prob))
+  return(list(plot1 = p1, plot2 = p2, df.roc = df.roc, prob.diff = prob.diff$pos.prob - prob.diff$neg.prob))
 }
 
-make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretest) {
-  prob.diff <- calc.prob.difference(df, pretest)
-  df <- df[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
-  prob.diff <- calc.prob.difference(df, pretest)
-  df.raw <- df.raw[df.raw$variable <= max(df$x.value), ]
+make.combined.probability.plots <- function(df.raw, df.roc, file.name, xaxis, pretest) {
+  prob.diff <- calc.prob.difference(df.roc, pretest)
+  prob.diff.tmp <- prob.diff[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  df.roc <- df.roc[!is.na(prob.diff$pos.prob - prob.diff$neg.prob) & is.finite(prob.diff$pos.prob - prob.diff$neg.prob), ]
+  prob.diff <- prob.diff.tmp
+  
+  df.raw <- df.raw[df.raw$variable <= max(df.roc$x.value), ]
   fit <- make.fit(df.raw)
   
   combined.probability <- (pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg / 
     ((pretest / (1 - pretest)) * prob.diff$lr.pos * prob.diff$lr.neg + 1)
   
-  df <- cbind(df, combined.probability)
+  df.roc <- cbind(df.roc, combined.probability)
   
   p1 <- ggplot() + 
-    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
+    geom_segment(aes(x = 0, y = pretest, xend = max(df.roc$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = df.roc, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
-    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df.roc$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
@@ -466,11 +472,11 @@ make.combined.probability.plots <- function(df.raw, df, file.name, xaxis, pretes
           legend.background = element_rect(fill = alpha('white', 0.0)))
   
   p3 <- ggplot() + 
-    geom_segment(aes(x = 0, y = pretest, xend = max(df$x.value), yend = pretest, color = 'a'), linetype = 2) +
-    geom_point(data = df, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
+    geom_segment(aes(x = 0, y = pretest, xend = max(df.roc$x.value), yend = pretest, color = 'a'), linetype = 2) +
+    geom_point(data = df.roc, aes(x = x.value, y = combined.probability, color = "b"), size = 0.5) +
     geom_point(data = df.raw.tmp, aes(x = x.value, y = y.value, color = "c"), size = 0.5) +
     geom_point(data = data.frame(x = 0, y = pretest), aes(x = x, y = y, color = 'a')) +
-    geom_point(data = data.frame(x = max(df$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
+    geom_point(data = data.frame(x = max(df.roc$x.value), y = pretest), aes(x = x, y = y, color = 'a')) +
     ylim(0, 1) + 
     xlab(xaxis) +
     ylab("probability pneumococcal") +
@@ -497,13 +503,13 @@ run.main.analysis <- function() {
   roc.data.lytA <- make.test.stats.df(df = raw.lytA, which.variable = "pneumo")
   
   p.log.lytA <- make.logistic.plot(df = raw.lytA, df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-  p.roc.lytA <- make.roc.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.roc.lytA <- make.roc.plot(df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
   
-  p.sens.spec.lytA <- make.sens.spec.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-  p.lr.lytA <- make.likelihoodratio.plot(df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-  p.continuous.lr.lytA <- make.continuous.likelihoodratio.plot(df = roc.data.lytA, df.raw = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-  p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
-  p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.sens.spec.lytA <- make.sens.spec.plot(df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.lr.lytA <- make.likelihoodratio.plot(df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.continuous.lr.lytA <- make.continuous.likelihoodratio.plot(df.roc = roc.data.lytA, df.raw = raw.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.prob.lytA <- make.probability.plots(df.raw = raw.lytA, df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
+  p.combined.prob.lytA <- make.combined.probability.plots(df.raw = raw.lytA, df.roc = roc.data.lytA, file.name = lytA.filename, xaxis = lytA.xaxis, pretest = pretest.probability)
   
   #print(mean(p.prob.lytA$prob.diff[(p.prob.lytA[["df"]])[["x.value"]] < 6]))
   
@@ -516,13 +522,13 @@ run.main.analysis <- function() {
   roc.data.pct <- make.test.stats.df(df = raw.pct, which.variable = "pneumo")
   
   p.log.pct <- make.logistic.plot(df = raw.pct, df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-  p.roc.pct <- make.roc.plot(df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.roc.pct <- make.roc.plot(df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
   
   p.sens.spec.pct <- make.sens.spec.plot(roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-  p.lr.pct <- make.likelihoodratio.plot(roc.data.pct, pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-  p.continuous.lr.pct <- make.continuous.likelihoodratio.plot(df = roc.data.pct, df.raw = raw.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-  p.prob.pct <- make.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
-  p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.lr.pct <- make.likelihoodratio.plot(df.roc = roc.data.pct, pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.continuous.lr.pct <- make.continuous.likelihoodratio.plot(df.roc = roc.data.pct, df.raw = raw.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.prob.pct <- make.probability.plots(df.raw = raw.pct, df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
+  p.combined.prob.pct <- make.combined.probability.plots(df.raw = raw.pct, df.roc = roc.data.pct, file.name = pct.filename, xaxis = pct.xaxis, pretest = pretest.probability)
   
   #print(mean(p.prob.pct$prob.diff[2 < (p.prob.pct[["df"]])[["x.value"]] & (p.prob.pct[["df"]])[["x.value"]] < 40]))
   
@@ -536,13 +542,13 @@ run.main.analysis <- function() {
   roc.data.crp <- make.test.stats.df(df = raw.crp, which.variable = "pneumo")
   
   p.log.crp <- make.logistic.plot(df = raw.crp, df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-  p.roc.crp <- make.roc.plot(df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.roc.crp <- make.roc.plot(df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
   
   p.sens.spec.crp <- make.sens.spec.plot(roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-  p.lr.crp <- make.likelihoodratio.plot(roc.data.crp, crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-  p.continuous.lr.crp <- make.continuous.likelihoodratio.plot(df = roc.data.crp, df.raw = raw.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-  p.prob.crp <- make.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
-  p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.lr.crp <- make.likelihoodratio.plot(df.roc = roc.data.crp, crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.continuous.lr.crp <- make.continuous.likelihoodratio.plot(df.roc = roc.data.crp, df.raw = raw.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.prob.crp <- make.probability.plots(df.raw = raw.crp, df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
+  p.combined.prob.crp <- make.combined.probability.plots(df.raw = raw.crp, df.roc = roc.data.crp, file.name = crp.filename, xaxis = crp.xaxis, pretest = pretest.probability)
   
   #print(mean(p.prob.crp$prob.diff[100 < (p.prob.crp[["df"]])[["x.value"]]]))
   
@@ -597,7 +603,7 @@ run.two.variable.analysis <- function() {
   p.roc.lytA.pct <- make.roc.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
   
   p.sens.spec.lytA.pct <- make.sens.spec.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
-  p.lr.lytA.pct <- make.likelihoodratio.plot(df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
+  p.lr.lytA.pct <- make.likelihoodratio.plot(df.roc = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
   p.continuous.lr.lytA.pct <- make.continuous.likelihoodratio.plot(df = roc.data.lytA.pct, df.raw = raw.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
   p.prob.lytA.pct <- make.probability.plots(df.raw = raw.lytA.pct, df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
   p.combined.prob.lytA.pct <- make.combined.probability.plots(df.raw = raw.lytA.pct, df = roc.data.lytA.pct, file.name = lytA.pct.filename, xaxis = lytA.pct.xaxis, pretest = pretest.probability)
